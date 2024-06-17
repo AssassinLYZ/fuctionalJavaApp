@@ -1,21 +1,36 @@
 package org.example;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 public class Main {
 
     public static void main(String[] args) {
-        generateData();
+        // Generate data and output to JSON file
+        generateDataAndWriteToJsonFile("data.json");
     }
 
-    public static void generateData() {
+    private static void generateDataAndWriteToJsonFile(String fileName) {
+        Container container = generateContainer();
+        writeContainerToJsonFile(container, fileName);
+    }
+
+    public static Container generateContainer() {
         // Step 1: Generate a random UUID without dashes and in uppercase
         String uuid = generateUpperCaseUUID();
 
@@ -42,14 +57,9 @@ public class Main {
         String inputForHash = uuid + dateTime + roundedResult.toPlainString();
         String md5Hash = generateMD5Hash(inputForHash);
 
-        System.out.println("UUID: " + uuid);
-        System.out.println("DateTime: " + dateTime);
-        System.out.println("Random Number 1: " + randomNumber1);
-        System.out.println("Random Number 2: " + randomNumber2);
-        System.out.println("Rounded Result: " + roundedResult);
-        System.out.println("Calculation Result: " + calculationResult);
-        System.out.println("MD5 Hash: " + md5Hash);
-
+        // Create and return a Container object
+        return new Container(uuid, dateTime, randomNumber1, randomNumber2,
+                roundedResult, calculationResult, md5Hash);
     }
 
     private static String generateUpperCaseUUID() {
@@ -79,4 +89,52 @@ public class Main {
             throw new RuntimeException("MD5 hashing failed", e);
         }
     }
+
+    public static String containerToJsonString(Container container) {
+        ObjectMapper objectMapper = new ObjectMapper();
+        try {
+            return objectMapper.writeValueAsString(container);
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    private static void writeContainerToJsonFile(Container container, String fileName) {
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
+
+        File file = new File(fileName);
+        List<Container> containers = new ArrayList<>();
+
+        // If the file exists, read the existing content
+        if (file.exists()) {
+            try {
+                containers = objectMapper.readValue(file, new TypeReference<List<Container>>() {});
+            } catch (IOException e) {
+                System.err.println("Failed to read existing data from " + fileName + ": " + e.getMessage());
+            }
+        }
+
+        // Add the new Container object to the list
+        containers.add(container);
+
+        // Convert the updated list to a JSON string
+        String jsonString;
+        try {
+            jsonString = objectMapper.writeValueAsString(containers);
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+            return;
+        }
+
+        // Write the JSON string to the file
+        try (FileWriter fileWriter = new FileWriter(file, false)) { // Use 'false' to overwrite existing content
+            fileWriter.write(jsonString);
+            System.out.println("Data has been written to " + fileName);
+        } catch (IOException e) {
+            System.err.println("Failed to write data to " + fileName + ": " + e.getMessage());
+        }
+    }
+
 }
